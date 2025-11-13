@@ -1,106 +1,109 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { SupabaseService } from '../supabase/supabase.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { PaginatedResponseDto } from '../common/dto/pagination.dto';
 
-interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 @Injectable()
 export class ProductsService {
-  private products: Product[] = [];
-  private idCounter = 1;
+  constructor(private readonly supabase: SupabaseService) {}
 
-  constructor() {
-    this.seedData();
+  async create(createProductDto: CreateProductDto): Promise<ProductResponseDto> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('products')
+      .insert([createProductDto])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return data;
   }
 
-  private seedData() {
-    const sampleProducts = [
-      { name: 'Professional Keyboard', description: 'Mechanical keyboard with RGB lighting', price: 149.99 },
-      { name: 'Ergonomic Mouse', description: 'Wireless mouse with precision tracking', price: 79.99 },
-      { name: 'HD Webcam Pro', description: '4K webcam for video conferencing', price: 199.99 },
-      { name: 'USB-C Hub', description: '7-in-1 connectivity hub', price: 49.99 },
-      { name: 'Laptop Stand Pro', description: 'Aluminum adjustable laptop stand', price: 59.99 },
-      { name: 'Blue Light Glasses', description: 'Computer glasses with blue light filter', price: 29.99 },
-      { name: 'Desk Mat XL', description: 'Extra large premium desk mat', price: 24.99 },
-      { name: 'Monitor Light Bar', description: 'Screen-mounted LED light bar', price: 89.99 },
-    ];
-
-    sampleProducts.forEach((product) => this.create(product));
-  }
-
-  create(createProductDto: CreateProductDto): ProductResponseDto {
-    const product: Product = {
-      id: String(this.idCounter++),
-      ...createProductDto,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.products.push(product);
-    return product;
-  }
-
-  findAll(page: number = 1, limit: number = 10, search?: string): PaginatedResponseDto<ProductResponseDto> {
-    let filtered = [...this.products];
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    categoryId?: string,
+  ): Promise<PaginatedResponseDto<ProductResponseDto>> {
+    let query = this.supabase.getClient().from('products').select('*', { count: 'exact' });
 
     if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchLower) ||
-          (p.description && p.description.toLowerCase().includes(searchLower)),
-      );
+      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
-    const total = filtered.length;
+    if (categoryId) {
+      query = query.eq('category_id', categoryId);
+    }
+
     const startIndex = (page - 1) * limit;
-    const items = filtered.slice(startIndex, startIndex + limit);
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(startIndex, startIndex + limit - 1);
+
+    if (error) throw error;
 
     return {
-      items,
+      items: data || [],
       page,
       limit,
-      total,
+      total: count || 0,
     };
   }
 
-  findOne(id: string): ProductResponseDto {
-    const product = this.products.find((p) => p.id === id);
-    if (!product) {
+  async findOne(id: string): Promise<ProductResponseDto> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
-    return product;
+
+    return data;
   }
 
-  update(id: string, updateProductDto: UpdateProductDto): ProductResponseDto {
-    const product = this.products.find((p) => p.id === id);
-    if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+  async update(id: string, updateProductDto: UpdateProductDto): Promise<ProductResponseDto> {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('products')
+      .update({ ...updateProductDto, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new NotFoundException(`Product with ID ${id} not found`);
+      }
+      throw error;
     }
 
-    Object.assign(product, updateProductDto, { updatedAt: new Date() });
-    return product;
+    return data;
   }
 
-  remove(id: string): void {
-    const index = this.products.findIndex((p) => p.id === id);
-    if (index === -1) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
-    }
-    this.products.splice(index, 1);
+  async remove(id: string): Promise<void> {
+    const { error } = await this.supabase.getClient().from('products').delete().eq('id', id);
+
+    if (error) throw error;
   }
 
-  getStats() {
-    const count = this.products.length;
-    const total = this.products.reduce((sum, p) => sum + p.price, 0);
+  async getStats() {
+    const { data, error } = await this.supabase
+      .getClient()
+      .from('products')
+      .select('price');
+
+    if (error) throw error;
+
+    const count = data?.length || 0;
+    const total = data?.reduce((sum, p) => sum + Number(p.price), 0) || 0;
     const avgPrice = count > 0 ? total / count : 0;
 
     return {

@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, Min, MaxLength } from 'class-validator';
+import { IsString, IsNumber, IsOptional, Min, MaxLength, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProductDto {
@@ -30,4 +30,22 @@ export class CreateProductDto {
   @IsNumber()
   @Min(0)
   price: number;
+
+  @ApiProperty({
+    description: 'Category ID',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  category_id?: string;
+
+  @ApiProperty({
+    description: 'Product image URL',
+    example: 'https://example.com/image.jpg',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  image_url?: string;
 }

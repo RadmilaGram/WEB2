@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/css/catalog.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>{{title}}</h1>
+      <p class="subtitle">Browse our collection of products</p>
+    </header>
+
+    <div class="filters">
+      <form method="GET" action="/catalog" class="filter-form">
+        <div class="search-box">
+          <input
+            type="text"
+            name="q"
+            placeholder="Search products..."
+            value="{{filters.search}}"
+            class="search-input"
+          >
+          <button type="submit" class="search-btn">Search</button>
+        </div>
+
+        <div class="category-filter">
+          <label for="category">Category:</label>
+          <select name="category_id" id="category" class="category-select" onchange="this.form.submit()">
+            <option value="">All Categories</option>
+            {{#each categories}}
+              <option value="{{this.id}}" {{#if (eq ../filters.categoryId this.id)}}selected{{/if}}>
+                {{this.name}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <div class="products-grid">
+      {{#if products.length}}
+        {{#each products}}
+          <div class="product-card">
+            {{#if this.image_url}}
+              <img src="{{this.image_url}}" alt="{{this.name}}" class="product-image">
+            {{else}}
+              <div class="product-image-placeholder">No Image</div>
+            {{/if}}
+            <div class="product-info">
+              <h3 class="product-name">{{this.name}}</h3>
+              <p class="product-description">{{this.description}}</p>
+              <p class="product-price">${{this.price}}</p>
+            </div>
+          </div>
+        {{/each}}
+      {{else}}
+        <div class="no-products">
+          <p>No products found matching your criteria.</p>
+        </div>
+      {{/if}}
+    </div>
+
+    {{#if pagination.totalPages}}
+      <div class="pagination">
+        {{#if pagination.hasPrev}}
+          <a href="?page={{subtract pagination.currentPage 1}}&q={{filters.search}}&category_id={{filters.categoryId}}" class="pagination-btn">
+            Previous
+          </a>
+        {{/if}}
+
+        <span class="page-info">
+          Page {{pagination.currentPage}} of {{pagination.totalPages}}
+        </span>
+
+        {{#if pagination.hasNext}}
+          <a href="?page={{add pagination.currentPage 1}}&q={{filters.search}}&category_id={{filters.categoryId}}" class="pagination-btn">
+            Next
+          </a>
+        {{/if}}
+      </div>
+    {{/if}}
+  </div>
+</body>
+</html>

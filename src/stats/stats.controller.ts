@@ -22,7 +22,7 @@ export class StatsController {
       },
     },
   })
-  getProductStats(): ProductStatsResponseDto {
+  async getProductStats(): Promise<ProductStatsResponseDto> {
     return this.productsService.getStats();
   }
 }
